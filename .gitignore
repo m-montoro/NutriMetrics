@@ -1,0 +1,15 @@
+# OpenTofu
+infraestrutura/.terraform/
+infraestrutura/*.tfstate
+infraestrutura/*.tfstate.*
+infraestrutura/.terraform.lock.hcl
+
+# Chaves privadas
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Python
+__pycache__/
+*.pyc

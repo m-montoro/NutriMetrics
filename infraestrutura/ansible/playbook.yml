@@ -1,0 +1,24 @@
+---
+- name: Preparar ambiente do NutriMetrics
+  hosts: nutrimetrics
+  become: true
+
+  tasks:
+    - name: Atualizar lista de pacotes
+      apt:
+        update_cache: true
+
+    - name: Instalar Python
+      apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Criar pasta do projeto
+      file:
+        path: /home/nutri/nutrimetrics
+        state: directory
+        owner: nutri
+        group: nutri
+        mode: "0755"
