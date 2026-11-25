@@ -4,7 +4,7 @@ Projeto integrado do curso de Ciência da Computação, desenvolvido no 1º seme
 **Murilo Montoro Marqui** RA: 26001976 
 **Álvaro Gruli** RA: 26001991
 
-A proposta inicial, chamada **NutriVision**, era acompanhar a evolução de pacientes ao longo do tempo. O NutriMetrics implementa a etapa de simulação de refeições para análise de dados. O Python gera os registros e o R consolida as informações em uma tabela por paciente. Todos os pacientes, refeições e indicadores corporais são fictícios e destinados a uso acadêmico.
+O NutriMetrics implementa a etapa de simulação de refeições para análise de dados. O Python gera os registros e o R consolida as informações em uma tabela por paciente. Todos os pacientes, refeições e indicadores corporais são fictícios e destinados a uso acadêmico.
 
 ## Requisitos
 
