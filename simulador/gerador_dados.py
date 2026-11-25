@@ -19,7 +19,7 @@ FUSO_REFEICOES = timezone(timedelta(hours=-3))
 SAIDA_PADRAO = Path(__file__).resolve().parent.parent / "dados/dados_nutricionais.csv"
 CAMPOS_PACIENTE = (
     "paciente_id", "idade", "peso_kg", "altura_m", "imc",
-    "objetivo_nutricional", "nivel_atividade_fisica",
+    "objetivo_nutricional", "nivel_atividade_fisica", "sexo", "n_refeicoes_livres", "atividade_fisica",
 )
 COLUNAS = (
     "registro_id", *CAMPOS_PACIENTE, "tipo_refeicao", "alimento_principal",
@@ -74,6 +74,17 @@ def decimal2(valor: object) -> str:
     return str(Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def complemento_paciente(identificador, nivel):
+    """Sorteia os dados ficticios uma vez por paciente."""
+    rng = random.Random(int(hashlib.sha256(identificador.encode()).hexdigest(), 16))
+    return {
+        "sexo": rng.choice(("homem", "mulher")),
+        "n_refeicoes_livres": rng.randint(0, 100),
+        "atividade_fisica": "nao_faz_nada" if nivel == "sedentario" else rng.choice(
+            ("academia", "corrida", "bicicleta", "caminhada", "natacao", "danca")),
+    }
+
+
 def perfil_paciente(seed: int, indice: int) -> dict[str, object]:
     """Mantém os mesmos dados para cada paciente."""
     digest = hashlib.sha256(f"nutrimetrics:{VERSAO}:{seed}:{indice}".encode()).hexdigest()
@@ -84,7 +95,7 @@ def perfil_paciente(seed: int, indice: int) -> dict[str, object]:
     objetivos = ("reducao_peso", "manutencao", "ganho_massa")
     # Sorteia o objetivo do paciente, levando o IMC em conta.
     pesos = (7, 2, 1) if imc >= 27 else (1, 5, 4)
-    return {
+    perfil = {
         "paciente_id": "pac_" + digest,
         "idade": rng.randint(18, 80),
         "peso_kg": str(peso),
@@ -93,6 +104,8 @@ def perfil_paciente(seed: int, indice: int) -> dict[str, object]:
         "objetivo_nutricional": rng.choices(objetivos, weights=pesos)[0],
         "nivel_atividade_fisica": rng.choice(ATIVIDADES),
     }
+    perfil.update(complemento_paciente(perfil["paciente_id"], perfil["nivel_atividade_fisica"]))
+    return perfil
 
 
 def gerar_registros(quantidade: int, seed: int, pacientes: int,

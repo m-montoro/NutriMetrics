@@ -23,3 +23,6 @@ id_ed25519
 .DS_Store
 
 *.controle/
+
+dados/filtrados/
+dados/tratados/

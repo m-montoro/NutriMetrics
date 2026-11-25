@@ -2,6 +2,8 @@
 
 import argparse
 import json
+import shutil
+import subprocess
 import os
 from pathlib import Path
 import sys
@@ -57,6 +59,23 @@ def positivo(texto):
     return valor
 
 
+def encontrar_r(caminho=None):
+    if caminho:
+        encontrado = shutil.which(caminho)
+        if encontrado:
+            return encontrado
+        raise ValueError("Rscript não encontrado no caminho informado.")
+    encontrado = shutil.which("Rscript")
+    if encontrado:
+        return encontrado
+    if os.name == "nt":
+        base = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "R"
+        candidatos = list(base.glob("R-*/bin/Rscript.exe"))
+        if candidatos:
+            return str(max(candidatos, key=lambda p: p.stat().st_mtime))
+    raise ValueError("Instale o R ou informe --rscript com o caminho de Rscript.")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("acao", choices=("ligar", "desligar", "status"))
@@ -65,6 +84,10 @@ def main(argv=None):
     parser.add_argument("--pacientes", type=int, default=100)
     parser.add_argument("--intervalo-segundos", type=positivo, default=300,
                         help="Intervalo entre rodadas; padrão: 300 segundos (5 minutos).")
+    parser.add_argument("--filtrar", action="store_true", help="Executa o R após cada rodada.")
+    parser.add_argument("--rscript", help="Caminho de Rscript, se necessário.")
+    parser.add_argument("--pasta-filtrados", type=Path,
+                        default=Path(__file__).resolve().parents[1] / "dados")
     args = parser.parse_args(argv)
     if args.quantidade < 10 or args.pacientes < 1:
         parser.error("A quantidade mínima é 10 e o número de pacientes deve ser positivo.")
@@ -92,6 +115,11 @@ def main(argv=None):
         return 1
     rodadas = 0
     try:
+        raiz = Path(__file__).resolve().parents[1]
+        rscript = encontrar_r(args.rscript) if args.filtrar else None
+        script_r = raiz / "tratamento/filtrar_automatico.R"
+        if rscript and not script_r.is_file():
+            raise ValueError("O arquivo tratamento/filtrar_automatico.R não foi encontrado.")
         controle.parada.unlink(missing_ok=True)
         print(f"Gerador ligado: {args.quantidade} registros por rodada, a cada {args.intervalo_segundos:g} segundos.", flush=True)
         print(f"CSV: {saida}\nMantenha este terminal aberto. Ctrl+C também desliga.", flush=True)
@@ -107,7 +135,19 @@ def main(argv=None):
             seed = gerador.executar(args.quantidade, saida, None, args.pacientes,
                                     ontem - timedelta(days=29), ontem)
             rodadas += 1
-            controle.salvar(quantidade=args.quantidade, intervalo_segundos=args.intervalo_segundos,
+            controle.salvar(rodadas=rodadas, etapa="filtrando" if rscript else "aguardando",
+                            saida=str(saida), quantidade=args.quantidade)
+            if rscript:
+                ambiente = os.environ.copy()
+                ambiente["LC_ALL"] = "C"
+                ambiente["LANG"] = "C"
+                # Aguarda o R terminar antes de gerar a proxima rodada.
+                with gerador.bloquear(saida):
+                    subprocess.run([rscript, str(script_r), str(saida),
+                                    str(args.pasta_filtrados.expanduser().resolve())],
+                                   cwd=raiz, env=ambiente, check=True, timeout=600)
+                print("Filtragem concluída.", flush=True)
+            controle.salvar(etapa="aguardando", filtragem_automatica=bool(rscript), quantidade=args.quantidade, intervalo_segundos=args.intervalo_segundos,
                             rodadas=rodadas, ultima_geracao=datetime.now().astimezone().isoformat(),
                             seed=seed, saida=str(saida))
             print(f"Rodada {rodadas}: {args.quantidade} registros gravados.", flush=True)
@@ -115,7 +155,7 @@ def main(argv=None):
             proxima = max(inicio + args.intervalo_segundos, time.monotonic())
     except KeyboardInterrupt:
         print("Parada pelo teclado.")
-    except (OSError, ValueError, gerador.csv.Error) as erro:
+    except (OSError, ValueError, gerador.csv.Error, subprocess.SubprocessError) as erro:
         print(f"Erro: {erro}", file=sys.stderr)
         return 1
     finally:
